@@ -1,16 +1,16 @@
-# Day 23 Lab Reflection
+# Báo Cáo Thực Hành Ngày 23
 
-> Fill in each section. Grader reads the "What I'd change" paragraph closest.
+> Điền đầy đủ từng mục. Giám khảo chấm kỹ nhất mục "Thay đổi quan trọng nhất".
 
-**Student:** Vu Quang Bao
-**Submission date:** 2026-06-29
-**Lab repo URL:** https://github.com/BaoVu2k4/2A202600610-VuQuangBao-Day23
+**Sinh viên:** Vũ Quang Bảo
+**Ngày nộp:** 2026-06-29
+**Link repo GitHub:** https://github.com/BaoVu2k4/2A202600610-VuQuangBao-Day23
 
 ---
 
-## 1. Hardware + setup output
+## 1. Thông tin phần cứng + kết quả kiểm tra môi trường
 
-Paste output of `python3 00-setup/verify-docker.py`:
+Kết quả chạy `python3 00-setup/verify-docker.py`:
 
 ```
 Docker:        OK  (29.5.3)
@@ -20,69 +20,73 @@ Ports free:    BOUND: [8000, 9090, 9093, 3000, 3100, 16686, 4317, 4318, 8888]
 Report written: D:\AI_THUCCHIEN\NGAY23\2A202600610-VuQuangBao-Day23\00-setup\setup-report.json
 ```
 
-(Ports show as BOUND because the stack is already running — this is expected, not a failure.)
+*(Các cổng hiển thị BOUND là vì stack đang chạy và đang chiếm những cổng đó — đây là trạng thái bình thường, không phải lỗi.)*
 
 ---
 
-## 2. Track 02 — Dashboards & Alerts
+## 2. Track 02 — Dashboard & Cảnh báo
 
-### 6 essential panels (screenshot)
+### 6 panel chính (ảnh chụp màn hình)
 
-Drop `submission/screenshots/dashboard-overview.png`.
+Xem file `submission/screenshots/dashboard-overview.png`.
 
-### Burn-rate panel
+### Panel Burn-rate
 
-Drop `submission/screenshots/slo-burn-rate.png`.
+Xem file `submission/screenshots/slo-burn-rate.png`.
 
-### Alert fire + resolve
+### Vòng đời cảnh báo: nổ → tắt
 
-| When | What | Evidence |
+| Thời điểm | Sự kiện | Bằng chứng |
 |---|---|---|
-| T0 | killed `day23-app` with `docker stop day23-app` | — |
-| T0+90s | `ServiceDown` fired (severity=critical, receiver=slack-critical) | screenshot `alertmanager-firing.png` |
-| T1 | restored app with `docker start day23-app` | — |
-| T1+60s | alert resolved (Alertmanager shows Resolved state) | — |
+| T0 | Tắt service app bằng lệnh `docker stop day23-app` | — |
+| T0+90s | Cảnh báo `ServiceDown` nổ (severity=critical, receiver=slack-critical) | Ảnh `alertmanager-firing.png` |
+| T1 | Khởi động lại app bằng lệnh `docker start day23-app` | — |
+| T1+60s | Cảnh báo tự động tắt (Alertmanager chuyển sang trạng thái Resolved) | — |
 
-### One thing surprised me about Prometheus / Grafana
+### Điều bất ngờ khi làm việc với Prometheus / Grafana
 
-The datasource UID mismatch was a hidden trap: Grafana auto-generates a random UID like `PBFA97CFB590B2093` when no `uid:` field is set in the provisioning YAML, but the dashboard JSON hard-codes `uid: "prometheus"`. Every panel silently showed "No data" until I added explicit `uid: prometheus` to `datasources.yml` and restarted Grafana. The fix was one line — but finding the root cause required comparing the provisioned datasource config against the dashboard JSON panel by panel.
+Cái bẫy ẩn nhất là **sự không khớp UID của datasource**. Khi file `provisioning/datasources/datasources.yml` không khai báo trường `uid:`, Grafana tự sinh ra một mã ngẫu nhiên như `PBFA97CFB590B2093` mỗi lần khởi động. Trong khi đó, toàn bộ file JSON dashboard đều dùng `uid: "prometheus"` để tham chiếu datasource. Hậu quả: tất cả 6 panel đều hiển thị "No data" mặc dù Prometheus hoạt động hoàn toàn bình thường. Chỉ cần thêm một dòng `uid: prometheus` vào file YAML rồi restart Grafana là tất cả panel sáng lên ngay lập tức — nhưng để tìm ra nguyên nhân gốc rễ thì mất khá nhiều thời gian so sánh từng panel.
 
 ---
 
 ## 3. Track 03 — Tracing & Logs
 
-### One trace screenshot from Jaeger
+### Ảnh chụp trace từ Jaeger
 
-Drop `submission/screenshots/jaeger-trace.png` showing `embed-text → vector-search → generate-tokens` spans.
+Xem file `submission/screenshots/jaeger-trace.png` — trace hiển thị chuỗi span: `predict` (lỗi ERROR) → `embed-text` → `vector-search` → `generate-tokens`.
 
-Trace ID: `2feae2ab9c2e45cd9bc3cb2be279946f` — 4 spans, depth 2, duration 167.64ms.
+- Trace ID: `2feae2ab9c2e45cd9bc3cb2be279946f`
+- Tổng số span: 4 — Độ sâu: 2 — Thời gian: 167.64ms
 
-### Log line correlated to trace
+### Dòng log liên kết với trace
 
 ```
-{"model": "llama3-mock", "input_tokens": 4, "output_tokens": 62, "quality": 0.794, "duration_seconds": 0.1746, "trace_id": "b521526de9e94511b711a6e981756d98", "event": "prediction served", "level": "info", "timestamp": "2026-06-29T03:26:18.198644Z"}
+{"model": "llama3-mock", "input_tokens": 4, "output_tokens": 62, "quality": 0.794,
+ "duration_seconds": 0.1746, "trace_id": "b521526de9e94511b711a6e981756d98",
+ "event": "prediction served", "level": "info",
+ "timestamp": "2026-06-29T03:26:18.198764Z"}
 ```
 
-The `trace_id` field in the structured log links directly to the corresponding trace in Jaeger. Loki's derived field config (`matcherRegex: '"trace_id":"([a-fA-F0-9]+)"'`) creates a clickable link from each log line to the Jaeger trace detail view.
+Trường `trace_id` trong log có cấu trúc JSON cho phép Loki tự động tạo đường dẫn liên kết sang Jaeger thông qua cấu hình `derivedFields` trong datasource. Giám khảo hoặc kỹ sư on-call chỉ cần click vào `trace_id` trong Loki là chuyển thẳng sang màn hình chi tiết trace trong Jaeger — không cần copy-paste thủ công.
 
-### Tail-sampling math
+### Tính toán tỉ lệ lấy mẫu (tail-sampling)
 
-The OTel collector ran at roughly 200 spans/second during the 60-second load test (≈11 000 spans received total / 55s ≈ 200 spans/s). With 4–5 spans per trace, that is about 40–50 traces/sec.
+Trong 60 giây load test, OTel collector nhận được khoảng **11.951 span** (tương đương ~200 span/giây). Với mỗi request sinh ra ~5 span, tốc độ trace là khoảng 40 trace/giây.
 
-Sampling math:
-- `keep-errors` policy: keeps all traces where any span has status ERROR → ~1% of production traffic (rare errors)
-- `keep-slow` policy: keeps traces with latency > 2 s → negligible during normal load
-- `probabilistic-1pct` policy: keeps 1 % of remaining healthy traces → 0.01 × 50 = 0.5 traces/sec
+Chính sách lọc:
+- `keep-errors`: giữ lại toàn bộ trace có ít nhất 1 span lỗi (HTTP 5xx / status ERROR)
+- `keep-slow`: giữ lại trace có độ trễ > 2.000ms
+- `probabilistic-1pct`: giữ ngẫu nhiên 1% trace còn lại (40 trace/s × 1% = 0,4 trace/s)
 
-Net result: ~1–2% of traces survive. Of 11 951 spans received, 122 spans were forwarded to Jaeger — a 99% reduction, exactly as designed for cost control.
+Kết quả thực tế: trong tổng số 11.951 span nhận vào, chỉ có **122 span được chuyển tiếp sang Jaeger** — giảm 99%, đúng như thiết kế để kiểm soát chi phí lưu trữ trace.
 
 ---
 
-## 4. Track 04 — Drift Detection
+## 4. Track 04 — Phát hiện trôi dữ liệu (Drift Detection)
 
-### PSI scores
+### Điểm PSI của từng đặc trưng
 
-Paste `04-drift-detection/reports/drift-summary.json`:
+Nội dung file `04-drift-detection/reports/drift-summary.json`:
 
 ```json
 {
@@ -117,29 +121,29 @@ Paste `04-drift-detection/reports/drift-summary.json`:
 }
 ```
 
-### Which test fits which feature?
+### Chọn phương pháp kiểm định phù hợp cho từng đặc trưng
 
-| Feature | Chosen test | Reason |
+| Đặc trưng | Phương pháp | Lý do |
 |---|---|---|
-| `prompt_length` | **PSI** | Continuous, unbounded distribution. PSI gives a single interpretable score (>0.2 = significant drift). The mean shift from 50→85 characters is large and PSI=3.46 confirms severe drift clearly. |
-| `embedding_norm` | **KS (Kolmogorov-Smirnov)** | Embedding norm is bounded near 1.0 with small variance. KS is sensitive to subtle shifts in the CDF without requiring binning, making it ideal for tight, well-behaved distributions. |
-| `response_length` | **KL divergence** | Response length has a roughly Gaussian shape. KL captures asymmetric divergence well and is natural when you care more about the reference distribution being "heavier" than the current one. |
-| `response_quality` | **PSI** | Quality score is a bounded [0,1] proportion from a Beta distribution. The distribution shifts from high-quality (Beta(8,2)) to low-quality (Beta(2,6)) — PSI=8.85 exposes this extreme shift immediately. |
+| `prompt_length` | **PSI** | Phân phối liên tục, không bị chặn. PSI cho một con số dễ hiểu (>0.2 = trôi nghiêm trọng). Độ dịch trung bình từ 50→85 ký tự rất lớn, PSI=3.46 phản ánh rõ ràng mức độ nghiêm trọng. |
+| `embedding_norm` | **KS (Kolmogorov-Smirnov)** | Phân phối gần chuẩn, phương sai nhỏ, dao động quanh 1.0. KS nhạy với sự thay đổi nhỏ trong hàm phân phối tích lũy mà không cần chia bin, phù hợp cho phân phối hẹp và ổn định. |
+| `response_length` | **KL Divergence** | Phân phối xấp xỉ Gaussian, KL nắm bắt tốt sự phân kỳ không đối xứng, đặc biệt hữu ích khi quan tâm đến phân phối tham chiếu đang "nặng đuôi" hơn phân phối hiện tại. |
+| `response_quality` | **PSI** | Điểm chất lượng bị chặn trong [0,1], phân phối Beta. Phân phối chuyển từ chất lượng cao Beta(8,2) sang thấp Beta(2,6) — PSI=8.85 phát hiện sự thay đổi cực đoan này ngay lập tức. |
 
 ---
 
-## 5. Track 05 — Cross-Day Integration
+## 5. Track 05 — Tích hợp liên ngày
 
-### Which prior-day metric was hardest to expose? Why?
+### Metric nào của các ngày trước khó đưa vào nhất? Tại sao?
 
-The hardest metric to expose would be **Day 20 — llama.cpp token throughput** (`monitor-day20-llama-cpp.py`). Unlike cloud-hosted services that expose standard Prometheus endpoints, llama.cpp runs as a local process that must be patched to emit `/metrics`. The monitor script must both start a sidecar exporter and handle the fact that llama.cpp's GPU offload configuration varies per machine — making the metric pipeline fragile unless you control the exact model and hardware. The cross-day dashboard panel correctly shows "No Data (start monitor-day20...)" because that service was not running in this isolated Day 23 environment.
+Metric khó tích hợp nhất là **token throughput của llama.cpp (Ngày 20)** từ script `monitor-day20-llama-cpp.py`. Khác với các service cloud có endpoint `/metrics` chuẩn, llama.cpp chạy như một tiến trình local và cần được vá thêm sidecar exporter để phát Prometheus metrics. Ngoài ra, cấu hình GPU offload của llama.cpp thay đổi tùy phần cứng, khiến pipeline metric dễ bị vỡ nếu không kiểm soát được model và hardware. Dashboard tích hợp hiển thị đúng "No Data (start monitor-day20...)" vì service này không chạy trong môi trường Day 23 độc lập.
 
 ---
 
-## 6. The single change that mattered most
+## 6. Thay đổi quan trọng nhất
 
-**Adding explicit datasource UIDs to the Grafana provisioning YAML** was the single change that transformed the stack from "technically running but showing nothing" to fully observable.
+**Thêm `uid: prometheus` và `uid: loki` vào file cấu hình Grafana datasource** là thay đổi duy nhất biến stack từ "chạy được nhưng không nhìn thấy gì" thành hoàn toàn có thể quan sát được.
 
-Every Grafana dashboard panel uses a `datasource` reference like `{"type": "prometheus", "uid": "prometheus"}`. When no `uid:` is set in `provisioning/datasources/datasources.yml`, Grafana auto-generates a random hash (e.g. `PBFA97CFB590B2093`) on first start. All six dashboard panels silently displayed "No data" because the UID in the provisioned datasource didn't match the hardcoded `"prometheus"` UID in the dashboard JSON. Adding two lines — `uid: prometheus` and `uid: loki` — to the YAML and restarting Grafana made every panel instantly light up with live metrics.
+Toàn bộ panel trong dashboard Grafana tham chiếu datasource qua cấu trúc `{"type": "prometheus", "uid": "prometheus"}`. Khi file `provisioning/datasources/datasources.yml` không khai báo trường `uid:`, Grafana tự sinh mã ngẫu nhiên (ví dụ `PBFA97CFB590B2093`) mỗi lần khởi động. Sáu panel dashboard đều âm thầm hiển thị "No data" vì UID trong datasource được cấp phát không khớp với UID `"prometheus"` được hard-code trong JSON dashboard. Chỉ thêm hai dòng — `uid: prometheus` và `uid: loki` — vào file YAML rồi restart Grafana là toàn bộ panel hiển thị dữ liệu thực ngay lập tức.
 
-This connects directly to the **dashboards-as-code** principle from the lecture: provisioning dashboards via JSON/YAML only works reliably when every reference is deterministic. Random auto-generated IDs break the contract between the datasource definition and the dashboard that consumes it. In a real production environment, this same bug would silently invalidate all your observability tooling during a Grafana upgrade or pod restart — exactly when you need dashboards most. The fix proves that "observable" is not a property of your data pipeline alone; it requires the entire chain from metric emitter → scraper → datasource → dashboard panel to share a consistent naming contract.
+Điều này liên hệ trực tiếp với nguyên tắc **dashboards-as-code** trong bài giảng: cấp phát dashboard qua JSON/YAML chỉ hoạt động đáng tin cậy khi mọi tham chiếu đều xác định (deterministic). Mã tự sinh phá vỡ hợp đồng giữa định nghĩa datasource và dashboard tiêu thụ nó. Trong môi trường production thực tế, cùng một bug này sẽ âm thầm vô hiệu hóa toàn bộ hệ thống quan sát sau mỗi lần nâng cấp Grafana hoặc restart pod — chính xác là lúc anh cần dashboard nhất. Bài học: "có thể quan sát được" không chỉ là tính chất của pipeline dữ liệu, mà đòi hỏi toàn bộ chuỗi từ metric emitter → scraper → datasource → dashboard panel phải dùng chung một quy ước đặt tên nhất quán.
